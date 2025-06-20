@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🎬 View Tickets</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: url('bg.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: white;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      background-color: rgba(0, 0, 0, 0.88);
+      margin: 40px auto;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 0 18px #000;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 25px;
+      font-size: 28px;
+    }
+
+    select, button {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      font-size: 17px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    button {
+      background-color: #0077cc;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: #fff;
+      color: #000;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th, td {
+      border: 1px solid #999;
+      padding: 8px;
+      text-align: center;
+    }
+
+    img.poster {
+      display: block;
+      width: 160px;
+      margin: 0 auto 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 8px #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎫 View Booked Tickets</h2>
+
+    <button onclick="location.href='index.html'">🏠 Back to Booking Page</button>
+
+    <select id="filterDay">
+      <option value="">-- Select Day --</option>
+      <option value="0">Sunday</option>
+      <option value="1">Monday</option>
+      <option value="2">Tuesday</option>
+      <option value="3">Wednesday</option>
+      <option value="4">Thursday</option>
+      <option value="5">Friday</option>
+      <option value="6">Saturday</option>
+    </select>
+
+    <select id="filterSlot">
+      <option value="">-- Select Slot --</option>
+      <option value="0">9:00 AM</option>
+      <option value="1">12:00 PM</option>
+      <option value="2">3:00 PM</option>
+      <option value="3">6:00 PM</option>
+    </select>
+
+    <button onclick="filterTickets()">🎟️ Show Filtered Tickets</button>
+    <button onclick="showAllTickets()">📋 Show All Tickets</button>
+    <button onclick="downloadWasmCSV()">⬇️ Export CSV</button>
+    <button onclick="clearWasmBookings()">🗑️ Clear All Bookings</button>
+
+    <div id="posterHolder"></div>
+
+    <div id="allTicketsSection" style="display: none;">
+      <h3>🎟️ All Booked Tickets</h3>
+      <table id="viewTable">
+        <thead>
+          <tr>
+            <th>Poster</th>
+            <th>Movie</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Date</th>
+            <th>Day</th>
+            <th>Time</th>
+            <th>Seat</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="ticket_booking_wasm.js"></script>
+  <script>
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const slots = ["9:00 AM", "12:00 PM", "3:00 PM", "6:00 PM"];
+    const posters = {
+      0: ["avengers.jpg", "batman.jpg", "avatar.jpg", "inception.jpg"],
+      1: ["joker.jpg", "frozen.jpg", "hobbit.jpg", "matrix.jpg"],
+      2: ["spiderman.jpg", "up.jpg", "moana.jpg", "soul.jpg"],
+      3: ["cars.jpg", "coco.jpg", "encanto.jpg", "onward.jpg"],
+      4: ["dune.jpg", "tenet.jpg", "interstellar.jpg", "gravity.jpg"],
+      5: ["transformers.jpg", "fast.jpg", "furious.jpg", "shazam.jpg"],
+      6: ["minions.jpg", "kungfu.jpg", "madagascar.jpg", "zootopia.jpg"]
+    };
+
+    const movieNames = {
+      "avengers.jpg": "Avengers",
+      "batman.jpg": "Batman",
+      "avatar.jpg": "Avatar",
+      "inception.jpg": "Inception",
+      "joker.jpg": "Joker",
+      "frozen.jpg": "Frozen",
+      "hobbit.jpg": "The Hobbit",
+      "matrix.jpg": "The Matrix",
+      "spiderman.jpg": "Spiderman",
+      "up.jpg": "UP",
+      "moana.jpg": "Moana",
+      "soul.jpg": "Soul",
+      "cars.jpg": "Cars",
+      "coco.jpg": "Coco",
+      "encanto.jpg": "Encanto",
+      "onward.jpg": "Onward",
+      "dune.jpg": "Dune",
+      "tenet.jpg": "Tenet",
+      "interstellar.jpg": "Interstellar",
+      "gravity.jpg": "Gravity",
+      "transformers.jpg": "Transformers",
+      "fast.jpg": "Fast & Furious",
+      "furious.jpg": "Furious 7",
+      "shazam.jpg": "Shazam",
+      "minions.jpg": "Minions",
+      "kungfu.jpg": "Kung Fu Panda",
+      "madagascar.jpg": "Madagascar",
+      "zootopia.jpg": "Zootopia"
+    };
+
+    let ModuleReady = false;
+    const allBookings = JSON.parse(localStorage.getItem("wasmBookings") || "[]");
+
+    function renderTable(data, showPoster = false) {
+      const tbody = document.querySelector("#viewTable tbody");
+      tbody.innerHTML = "";
+      data.forEach(b => {
+        const posterFile = posters[b.day]?.[b.slot] || "";
+        const movie = movieNames[posterFile] || "N/A";
+
+        tbody.innerHTML += `<tr>
+          ${showPoster ? `<td><img src="posters/${posterFile}" alt="${movie}" width="70"/></td>` : ""}
+          <td>${movie}</td>
+          <td>${b.name}</td>
+          <td>${b.email}</td>
+          <td>${b.phone}</td>
+          <td>${b.date}</td>
+          <td>${days[b.day]}</td>
+          <td>${slots[b.slot]}</td>
+          <td>${b.seat}</td>
+        </tr>`;
+      });
+    }
+
+    function filterTickets() {
+      const d = document.getElementById("filterDay").value;
+      const s = document.getElementById("filterSlot").value;
+      if (d === "" || s === "") return alert("Please select both day and time slot.");
+
+      const filtered = allBookings.filter(b => b.day == d && b.slot == s);
+      const poster = posters[d][s];
+      const movie = movieNames[poster] || "Selected Movie";
+
+      document.getElementById("posterHolder").innerHTML = `<img class='poster' src='posters/${poster}' alt='${movie}'>`;
+
+      document.getElementById("allTicketsSection").style.display = "block";
+      renderTable(filtered, false);
+    }
+
+    function showAllTickets() {
+      document.getElementById("posterHolder").innerHTML = "";
+      document.getElementById("allTicketsSection").style.display = "block";
+      renderTable(allBookings, true);
+    }
+
+    function downloadWasmCSV() {
+      if (ModuleReady) {
+        const csv = Module.ccall('export_bookings_csv', 'string');
+        const blob = new Blob([csv], { type: "text/csv" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "wasm_bookings.csv";
+        a.click();
+      }
+    }
+
+    function clearWasmBookings() {
+      if (ModuleReady) {
+        Module.ccall('clear_bookings');
+        localStorage.removeItem("wasmBookings");
+        renderTable([]);
+        alert("✅ All bookings cleared.");
+        document.getElementById("allTicketsSection").style.display = "none";
+        document.getElementById("posterHolder").innerHTML = "";
+      }
+    }
+
+    Module['onRuntimeInitialized'] = () => { ModuleReady = true; };
+  </script>
+</body>
+</html>

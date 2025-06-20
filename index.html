@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🎟️ Ticket Booking</title>
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+      background: url('bg.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: white;
+    }
+
+    .container {
+      max-width: 700px;
+      background-color: rgba(0, 0, 0, 0.8);
+      margin: 30px auto;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px #000;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    input, button {
+      width: 100%;
+      margin: 8px 0;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #ff5c5c;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #ff3333;
+    }
+
+    select {
+      width: 104% !important;
+      margin: 8px 0;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+    }
+
+    .movie-name {
+      margin-top: 8px;
+      font-weight: bold;
+      color: #fff;
+      font-size: 15px;
+      text-transform: capitalize;
+    }
+
+    .poster-card:hover {
+      transform: scale(1.05);
+      transition: transform 0.3s ease;
+      box-shadow: 0 0 15px #ffcc00;
+    }
+
+    .poster-card.selected {
+      outline: 3px solid #ffcc00;
+      background-color: #333;
+    }
+
+    #output {
+      margin-top: 15px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    #moviePosters {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      justify-items: center;
+      margin-top: 20px;
+    }
+
+    .poster-card {
+      background: #222;
+      padding: 10px;
+      border-radius: 8px;
+      width: 180px;
+      text-align: center;
+      box-shadow: 0 0 10px #000;
+    }
+
+    .poster-card img {
+      width: 160px;
+      height: 240px;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    }
+
+    .poster-card span {
+      display: block;
+      margin-top: 8px;
+      font-size: 15px;
+      color: #ffcc00;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎫 Online Ticket Booking</h2>
+    <form id="bookingForm">
+      <table style="width: 100%; border-spacing: 10px;">
+        <tr><td><input type="text" id="name" placeholder="Full Name" required></td></tr>
+        <tr><td><input type="email" id="email" placeholder="Email" required></td></tr>
+        <tr><td><input type="tel" id="phone" pattern="^\d{10}$" title="Enter exactly 10 digits" required></td></tr>
+        <tr><td><input type="date" id="date" required></td></tr>
+        <tr><td>
+          <select id="day" required>
+            <option value="">Select Day</option>
+            <option value="0">Sunday</option><option value="1">Monday</option>
+            <option value="2">Tuesday</option><option value="3">Wednesday</option>
+            <option value="4">Thursday</option><option value="5">Friday</option>
+            <option value="6">Saturday</option>
+          </select>
+        </td></tr>
+        <tr><td>
+          <select id="slot" required>
+            <option value="">Select Time</option>
+            <option value="0">9:00 AM</option><option value="1">12:00 PM</option>
+            <option value="2">3:00 PM</option><option value="3">6:00 PM</option>
+          </select>
+        </td></tr>
+        <tr><td><input type="number" id="seat" placeholder="Seat Number (1–50)" min="1" max="50" required></td></tr>
+        <tr><td><button type="submit">🎟️ Book Ticket</button></td></tr>
+      </table>
+    </form>
+
+    <div id="output"></div>
+
+    <div id="moviePosters"></div>
+
+    <div style="text-align: center; margin-top: 20px;">
+      <a href="view.html">
+        <button style="background-color: #00bfff;">🎬 View Booked Tickets</button>
+      </a>
+    </div>
+  </div>
+
+  <script src="ticket_booking_wasm.js"></script>
+  <script>
+    const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const slots = ["9:00 AM","12:00 PM","3:00 PM","6:00 PM"];
+    let ModuleReady = false;
+
+    const bookings = JSON.parse(localStorage.getItem("wasmBookings") || "[]");
+
+    document.getElementById("bookingForm").onsubmit = e => {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const date = document.getElementById("date").value;
+      const day = parseInt(document.getElementById("day").value);
+      const slot = parseInt(document.getElementById("slot").value);
+      const seat = parseInt(document.getElementById("seat").value);
+
+      const selectedPoster = document.querySelector('.poster-card.selected');
+      if (!selectedPoster) {
+        return document.getElementById("output").textContent = "❌ Please select a movie poster.";
+      }
+
+      if (!name || !email || !phone || !date || isNaN(day) || isNaN(slot) || isNaN(seat)) {
+        return document.getElementById("output").textContent = "❌ Fill all fields.";
+      }
+
+      const res = Module.ccall('book_ticket', 'string',
+        ['string','string','string','string','number','number','number'],
+        [name, email, phone, date, day, slot, seat]);
+
+      if (res.includes("✅")) {
+        bookings.push({ name, email, phone, date, day, slot, seat });
+        localStorage.setItem("wasmBookings", JSON.stringify(bookings));
+        document.getElementById("bookingForm").reset();
+      }
+      document.getElementById("output").textContent = res;
+    };
+
+    const movieDataByDay = {
+      0: ["avengers.jpg", "batman.jpg", "avatar.jpg", "inception.jpg"],
+      1: ["joker.jpg", "frozen.jpg", "hobbit.jpg", "matrix.jpg"],
+      2: ["spiderman.jpg", "up.jpg", "moana.jpg", "soul.jpg"],
+      3: ["cars.jpg", "coco.jpg", "encanto.jpg", "onward.jpg"],
+      4: ["dune.jpg", "tenet.jpg", "interstellar.jpg", "gravity.jpg"],
+      5: ["transformers.jpg", "fast.jpg", "furious.jpg", "shazam.jpg"],
+      6: ["minions.jpg", "kungfu.jpg", "madagascar.jpg", "zootopia.jpg"],
+    };
+
+    document.getElementById("day").onchange = e => {
+      const posters = movieDataByDay[e.target.value];
+      const container = document.getElementById("moviePosters");
+      container.innerHTML = "";
+
+      if (!posters) return;
+      posters.forEach((img, i) => {
+        const movieName = img.replace(".jpg", "").replace(/^\w/, c => c.toUpperCase());
+        container.innerHTML += `
+          <div class="poster-card" data-slot="${i}" onclick="selectPoster(this)">
+            <img src="posters/${img}" alt="${movieName}" />
+            <span>${slots[i]}</span>
+            <div class="movie-name">${movieName}</div>
+          </div>
+        `;
+      });
+    };
+
+    Module['onRuntimeInitialized'] = () => { ModuleReady = true; };
+
+    function selectPoster(card) {
+      document.querySelectorAll('.poster-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      const slotValue = card.getAttribute('data-slot');
+      document.getElementById('slot').value = slotValue;
+    }
+
+    document.getElementById("slot").onchange = e => {
+      const selectedSlot = e.target.value;
+      document.querySelectorAll('.poster-card').forEach(card => {
+        card.classList.remove('selected');
+        if (card.getAttribute('data-slot') === selectedSlot) {
+          card.classList.add('selected');
+        }
+      });
+    };
+  </script>
+</body>
+</html>
